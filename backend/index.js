@@ -78,7 +78,31 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 
-// Health check routes
+// Database status helper
+function getDBStatus() {
+  const readyStates = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+
+  const readyState = mongoose.connection.readyState
+  const isConnected = readyState === 1
+
+  return {
+    status: isConnected ? "connected" : "disconnected",
+    readyState,
+    readyStateText: readyStates[readyState],
+    host: isConnected ? mongoose.connection.host : "Not connected",
+    name: isConnected ? mongoose.connection.name : "Not connected",
+    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
+    mongoUri: process.env.MONGO_URI ? "✅ Configured" : "❌ Missing",
+    initialized: dbInitialized,
+  }
+}
+
+// 🚀 ROOT ROUTE
 app.get("/", (req, res) => {
   const dbStatus = getDBStatus()
 
@@ -89,11 +113,17 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.1",
+    version: "1.0.2",
     server: "Vercel Serverless",
+    endpoints: {
+      health: "/api/health",
+      reconnect: "/api/health/reconnect",
+      debug: "/api/debug/mongo",
+    },
   })
 })
 
+// 🚀 HEALTH CHECK ROUTE
 app.get("/api/health", async (req, res) => {
   const dbStatus = getDBStatus()
 
@@ -115,7 +145,7 @@ app.get("/api/health", async (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.1",
+    version: "1.0.2",
     memory: {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
@@ -126,6 +156,53 @@ app.get("/api/health", async (req, res) => {
       secretKeyConfigured: !!process.env.SECRET_KEY,
     },
   })
+})
+
+// 🚀 MANUAL RECONNECTION ENDPOINT (FIXED)
+app.post("/api/health/reconnect", async (req, res) => {
+  try {
+    console.log("🔄 Manual reconnection requested...")
+    const result = await reconnectDB()
+
+    res.json({
+      success: result.success,
+      message: result.message,
+      timestamp: new Date().toISOString(),
+      database: getDBStatus(),
+    })
+  } catch (error) {
+    console.error("❌ Reconnection error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Reconnection failed",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    })
+  }
+})
+
+// 🚀 ALSO ADD GET METHOD FOR EASIER TESTING
+app.get("/api/health/reconnect", async (req, res) => {
+  try {
+    console.log("🔄 Manual reconnection requested via GET...")
+    const result = await reconnectDB()
+
+    res.json({
+      success: result.success,
+      message: result.message,
+      timestamp: new Date().toISOString(),
+      database: getDBStatus(),
+      note: "Use POST method for proper reconnection",
+    })
+  } catch (error) {
+    console.error("❌ Reconnection error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Reconnection failed",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    })
+  }
 })
 
 // 🔍 DEBUG: Connection string format check
@@ -158,51 +235,37 @@ app.get("/api/debug/mongo", (req, res) => {
   })
 })
 
-// Manual reconnection endpoint
-app.post("/api/health/reconnect", async (req, res) => {
+// 🚀 FORCE CONNECTION ATTEMPT ENDPOINT
+app.get("/api/force-connect", async (req, res) => {
   try {
-    console.log("🔄 Manual reconnection requested...")
-    const result = await reconnectDB()
+    console.log("🔥 Force connection attempt...")
+
+    // Close existing connection
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close()
+      console.log("🔄 Closed existing connection")
+    }
+
+    // Force new connection
+    await connectDB()
 
     res.json({
-      success: result.success,
-      message: result.message,
-      timestamp: new Date().toISOString(),
+      success: true,
+      message: "Force connection completed",
       database: getDBStatus(),
+      timestamp: new Date().toISOString(),
     })
   } catch (error) {
+    console.error("❌ Force connection failed:", error)
     res.status(500).json({
       success: false,
-      message: "Reconnection failed",
+      message: "Force connection failed",
       error: error.message,
+      database: getDBStatus(),
       timestamp: new Date().toISOString(),
     })
   }
 })
-
-// Database status helper
-function getDBStatus() {
-  const readyStates = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  }
-
-  const readyState = mongoose.connection.readyState
-  const isConnected = readyState === 1
-
-  return {
-    status: isConnected ? "connected" : "disconnected",
-    readyState,
-    readyStateText: readyStates[readyState],
-    host: isConnected ? mongoose.connection.host : "Not connected",
-    name: isConnected ? mongoose.connection.name : "Not connected",
-    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
-    mongoUri: process.env.MONGO_URI ? "✅ Configured" : "❌ Missing",
-    initialized: dbInitialized,
-  }
-}
 
 // API Routes
 app.use("/api/v1/user", userRoute)
@@ -225,6 +288,14 @@ app.use("*", (req, res) => {
   res.status(404).json({
     message: `Route ${req.originalUrl} not found`,
     success: false,
+    availableEndpoints: [
+      "GET /",
+      "GET /api/health",
+      "POST /api/health/reconnect",
+      "GET /api/health/reconnect",
+      "GET /api/debug/mongo",
+      "GET /api/force-connect",
+    ],
   })
 })
 
