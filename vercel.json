@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "jobportal-backend",
+  "name": "jobportal-backend-express",
   "builds": [
     {
       "src": "backend/index.js",

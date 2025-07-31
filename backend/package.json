@@ -1,13 +1,13 @@
 {
   "name": "jobportal-backend",
   "version": "1.0.0",
-  "description": "Job Portal Backend API",
+  "description": "Job Portal Backend API - Express.js",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "build": "echo 'No build step required'"
+    "build": "echo 'Backend build complete - Express.js ready'"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -26,5 +26,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": ["express", "mongodb", "react", "job-portal", "backend-api"]
 }
