@@ -1,12 +1,17 @@
 {
   "version": 2,
-  "name": "jobportal-backend-express",
+  "name": "jobportal-backend-api",
   "builds": [
     {
       "src": "backend/index.js",
       "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
   "routes": [
     {
       "src": "/(.*)",
@@ -15,10 +20,5 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "functions": {
-    "backend/index.js": {
-      "maxDuration": 30
-    }
   }
 }
