@@ -128,6 +128,36 @@ app.get("/api/health", async (req, res) => {
   })
 })
 
+// 🔍 DEBUG: Connection string format check
+app.get("/api/debug/mongo", (req, res) => {
+  const mongoUri = process.env.MONGO_URI
+
+  if (!mongoUri) {
+    return res.json({
+      error: "MONGO_URI not found",
+      configured: false,
+    })
+  }
+
+  // Parse URI safely
+  const uriParts = {
+    protocol: mongoUri.split("://")[0],
+    hasCredentials: mongoUri.includes("@"),
+    hasDatabase: mongoUri.split("/").length > 3,
+    hasOptions: mongoUri.includes("?"),
+    length: mongoUri.length,
+    startsCorrectly: mongoUri.startsWith("mongodb"),
+    // Show first and last 10 characters for debugging
+    preview: `${mongoUri.substring(0, 20)}...${mongoUri.substring(mongoUri.length - 20)}`,
+  }
+
+  res.json({
+    configured: true,
+    format: uriParts,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 // Manual reconnection endpoint
 app.post("/api/health/reconnect", async (req, res) => {
   try {
