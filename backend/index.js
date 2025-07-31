@@ -7,40 +7,52 @@ import userRoute from "./routes/user.route.js"
 import companyRoute from "./routes/company.route.js"
 import jobRoute from "./routes/job.route.js"
 import applicationRoute from "./routes/application.route.js"
-import mongoose from "mongoose" // Import mongoose to check connection state
+import mongoose from "mongoose"
 
-// Load environment variables
+// Load environment variables FIRST
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 8000
 
-// Database connection
-connectDB()
+// Log environment variables (without sensitive data)
+console.log("🔍 Environment Check:")
+console.log("- NODE_ENV:", process.env.NODE_ENV)
+console.log("- PORT:", process.env.PORT)
+console.log("- MONGO_URI exists:", !!process.env.MONGO_URI)
+console.log("- MONGO_URI length:", process.env.MONGO_URI?.length || 0)
+
+// Database connection with error handling
+let dbConnected = false
+try {
+  await connectDB()
+  dbConnected = true
+} catch (error) {
+  console.error("❌ Initial DB connection failed, app will continue")
+  dbConnected = false
+}
 
 // Middleware
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(cookieParser())
 
-// CORS configuration for production
+// CORS configuration
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
 
     const allowedOrigins = [
       "http://localhost:5173",
       "http://localhost:3000",
-      process.env.FRONTEND_URL, // Use environment variable for frontend URL
+      "https://job-portal-topaz-three.vercel.app",
+      process.env.FRONTEND_URL,
     ].filter(Boolean)
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
-      // For now, allow all origins for easier testing.
-      // In production, you should restrict this to known origins.
-      callback(null, true)
+      callback(null, true) // Allow all for now
     }
   },
   credentials: true,
@@ -50,15 +62,17 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 
-// Enhanced health check route for the root URL
+// Enhanced health check with better error handling
 app.get("/", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   const dbReadyState = {
     0: "disconnected",
     1: "connected",
     2: "connecting",
     3: "disconnecting",
   }
+
+  const connectionState = mongoose.connection.readyState
+  const isConnected = connectionState === 1
 
   res.json({
     message: "Job Portal API is running!",
@@ -66,21 +80,22 @@ app.get("/", (req, res) => {
     uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
     database: {
-      status: dbStatus,
-      readyState: mongoose.connection.readyState,
-      readyStateText: dbReadyState[mongoose.connection.readyState],
-      host: mongoose.connection.host || "Not connected",
-      name: mongoose.connection.name || "Not connected",
-      collections: mongoose.connection.readyState === 1 ? Object.keys(mongoose.connection.collections).length : 0,
+      status: isConnected ? "connected" : "disconnected",
+      readyState: connectionState,
+      readyStateText: dbReadyState[connectionState],
+      host: isConnected ? mongoose.connection.host : "Not connected",
+      name: isConnected ? mongoose.connection.name : "Not connected",
+      collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
+      mongoUri: process.env.MONGO_URI ? "✅ Set" : "❌ Missing",
+      connectionAttempted: dbConnected,
     },
     environment: process.env.NODE_ENV || "development",
     version: "1.0.0",
   })
 })
 
-// Detailed health check route for /api/health
+// Detailed health check
 app.get("/api/health", async (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   const dbReadyState = {
     0: "disconnected",
     1: "connected",
@@ -88,33 +103,40 @@ app.get("/api/health", async (req, res) => {
     3: "disconnecting",
   }
 
-  let dbDetails = {
-    status: dbStatus,
-    readyState: mongoose.connection.readyState,
-    readyStateText: dbReadyState[mongoose.connection.readyState],
-    host: "Not connected",
-    name: "Not connected",
-    collections: 0,
+  const connectionState = mongoose.connection.readyState
+  const isConnected = connectionState === 1
+
+  const dbDetails = {
+    status: isConnected ? "connected" : "disconnected",
+    readyState: connectionState,
+    readyStateText: dbReadyState[connectionState],
+    host: isConnected ? mongoose.connection.host : "Not connected",
+    name: isConnected ? mongoose.connection.name : "Not connected",
+    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
     lastConnected: null,
+    mongoUri: process.env.MONGO_URI ? "✅ Set" : "❌ Missing",
+    connectionAttempted: dbConnected,
   }
 
-  // Get detailed DB info if connected
-  if (mongoose.connection.readyState === 1) {
+  // Test connection if connected
+  if (isConnected) {
     try {
-      dbDetails = {
-        ...dbDetails,
-        host: mongoose.connection.host,
-        name: mongoose.connection.name,
-        collections: Object.keys(mongoose.connection.collections).length,
-        lastConnected: new Date().toISOString(),
-      }
-
-      // Test database with a simple query
       await mongoose.connection.db.admin().ping()
       dbDetails.pingTest = "success"
+      dbDetails.lastConnected = new Date().toISOString()
     } catch (error) {
       dbDetails.pingTest = "failed"
       dbDetails.error = error.message
+    }
+  } else {
+    // Try to reconnect if disconnected
+    try {
+      console.log("🔄 Attempting to reconnect to database...")
+      await connectDB()
+      dbDetails.reconnectAttempt = "success"
+    } catch (error) {
+      dbDetails.reconnectAttempt = "failed"
+      dbDetails.reconnectError = error.message
     }
   }
 
@@ -132,64 +154,32 @@ app.get("/api/health", async (req, res) => {
   })
 })
 
-// Database-specific health check route
-app.get("/api/health/database", async (req, res) => {
-  const dbReadyState = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  }
-
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      status: "unhealthy",
-      database: {
-        status: "disconnected",
-        readyState: mongoose.connection.readyState,
-        readyStateText: dbReadyState[mongoose.connection.readyState],
-        message: "Database is not connected",
-      },
-      timestamp: new Date().toISOString(),
-    })
-  }
-
+// Database reconnection endpoint
+app.post("/api/health/reconnect", async (req, res) => {
   try {
-    // Test database connection with ping
-    await mongoose.connection.db.admin().ping()
+    console.log("🔄 Manual database reconnection requested...")
 
-    // Get database stats
-    const stats = await mongoose.connection.db.stats()
+    if (mongoose.connection.readyState === 1) {
+      return res.json({
+        success: true,
+        message: "Database is already connected",
+        status: "connected",
+      })
+    }
+
+    await connectDB()
 
     res.json({
-      status: "healthy",
-      database: {
-        status: "connected",
-        readyState: mongoose.connection.readyState,
-        readyStateText: "connected",
-        host: mongoose.connection.host,
-        name: mongoose.connection.name,
-        collections: Object.keys(mongoose.connection.collections).length,
-        stats: {
-          collections: stats.collections,
-          dataSize: `${Math.round(stats.dataSize / 1024 / 1024)} MB`,
-          storageSize: `${Math.round(stats.storageSize / 1024 / 1024)} MB`,
-          indexes: stats.indexes,
-        },
-        pingTest: "success",
-      },
+      success: true,
+      message: "Database reconnection successful",
+      status: "connected",
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    res.status(503).json({
-      status: "unhealthy",
-      database: {
-        status: "error",
-        readyState: mongoose.connection.readyState,
-        readyStateText: dbReadyState[mongoose.connection.readyState],
-        error: error.message,
-        pingTest: "failed",
-      },
+    res.status(500).json({
+      success: false,
+      message: "Database reconnection failed",
+      error: error.message,
       timestamp: new Date().toISOString(),
     })
   }
@@ -219,5 +209,11 @@ app.use("*", (req, res) => {
   })
 })
 
-// Export for Vercel
+// Start server
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`)
+  })
+}
+
 export default app
