@@ -2,188 +2,153 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import cors from "cors"
 import dotenv from "dotenv"
-import connectDB, { reconnectDB } from "./utils/db.js"
+import mongoose from "mongoose" // Declare mongoose variable
+import connectDB, { forceReconnect, getConnectionStatus, isDBConnected } from "./utils/db.js"
 import userRoute from "./routes/user.route.js"
 import companyRoute from "./routes/company.route.js"
 import jobRoute from "./routes/job.route.js"
 import applicationRoute from "./routes/application.route.js"
-import mongoose from "mongoose"
 
-// Load environment variables FIRST
+// Load environment variables
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 8000
 
-// Environment validation
-console.log("🔍 Environment Validation:")
-console.log("- NODE_ENV:", process.env.NODE_ENV)
-console.log("- PORT:", process.env.PORT)
-console.log("- MONGO_URI exists:", !!process.env.MONGO_URI)
-console.log("- SECRET_KEY exists:", !!process.env.SECRET_KEY)
+console.log("🚀 Starting Job Portal API...")
+console.log("📍 Environment:", process.env.NODE_ENV)
+console.log("🔑 MONGO_URI exists:", !!process.env.MONGO_URI)
+console.log("🔑 SECRET_KEY exists:", !!process.env.SECRET_KEY)
 
-// Initialize database connection
-let dbInitialized = false
-const initializeDB = async () => {
-  try {
-    console.log("🚀 Initializing database connection...")
-    await connectDB()
-    dbInitialized = true
-    console.log("✅ Database initialization completed")
-  } catch (error) {
-    console.error("❌ Database initialization failed:", error.message)
-    dbInitialized = false
-  }
-}
-
-// Start DB initialization (non-blocking)
-initializeDB()
+// Initialize database (non-blocking)
+connectDB().catch((err) => {
+  console.error("❌ Initial DB connection failed:", err.message)
+})
 
 // Middleware
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(cookieParser())
 
-// Enhanced CORS
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true)
+// CORS
+app.use(
+  cors({
+    origin: true, // Allow all origins for now
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  }),
+)
 
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://job-portal-topaz-three.vercel.app",
-      process.env.FRONTEND_URL,
-    ].filter(Boolean)
-
-    if (process.env.NODE_ENV === "development") {
-      return callback(null, true)
-    }
-
-    callback(null, true) // Allow all for now
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-  optionsSuccessStatus: 200,
-}
-
-app.use(cors(corsOptions))
-
-// Database status helper
-function getDBStatus() {
-  const readyStates = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  }
-
-  const readyState = mongoose.connection.readyState
-  const isConnected = readyState === 1
-
-  return {
-    status: isConnected ? "connected" : "disconnected",
-    readyState,
-    readyStateText: readyStates[readyState],
-    host: isConnected ? mongoose.connection.host : "Not connected",
-    name: isConnected ? mongoose.connection.name : "Not connected",
-    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
-    mongoUri: process.env.MONGO_URI ? "✅ Configured" : "❌ Missing",
-    initialized: dbInitialized,
-  }
-}
-
-// 🚀 ROOT ROUTE
+// 🏠 HOME ROUTE
 app.get("/", (req, res) => {
-  const dbStatus = getDBStatus()
+  const dbStatus = getConnectionStatus()
 
   res.json({
-    message: "🚀 Job Portal API is running!",
+    message: "🚀 Job Portal API is LIVE!",
     status: "healthy",
-    uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
     database: dbStatus,
-    environment: process.env.NODE_ENV || "development",
-    version: "1.0.3",
-    server: "Vercel Serverless",
-  })
-})
-
-// 🚀 HEALTH CHECK ROUTE
-app.get("/api/health", async (req, res) => {
-  const dbStatus = getDBStatus()
-
-  // Try to ping database if connected
-  if (dbStatus.readyState === 1) {
-    try {
-      await mongoose.connection.db.admin().ping()
-      dbStatus.pingTest = "✅ Success"
-      dbStatus.lastPing = new Date().toISOString()
-    } catch (error) {
-      dbStatus.pingTest = "❌ Failed"
-      dbStatus.pingError = error.message
-    }
-  }
-
-  res.json({
-    status: "healthy",
-    uptime: `${Math.floor(process.uptime())} seconds`,
-    timestamp: new Date().toISOString(),
-    database: dbStatus,
-    environment: process.env.NODE_ENV || "development",
-    version: "1.0.3",
-    memory: {
-      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
-      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
+    version: "2.0.0",
+    endpoints: {
+      health: "/api/health",
+      reconnect: "/api/reconnect",
+      test: "/api/test-db",
     },
   })
 })
 
-// 🚀 MANUAL RECONNECTION ENDPOINT
-app.post("/api/health/reconnect", async (req, res) => {
+// 🏥 HEALTH CHECK
+app.get("/api/health", async (req, res) => {
+  const dbStatus = getConnectionStatus()
+
+  // Try ping if connected
+  if (dbStatus.isConnected) {
+    try {
+      await mongoose.connection.db.admin().ping()
+      dbStatus.pingTest = "✅ Success"
+    } catch (error) {
+      dbStatus.pingTest = "❌ Failed: " + error.message
+    }
+  }
+
+  res.json({
+    status: "healthy",
+    uptime: Math.floor(process.uptime()) + " seconds",
+    timestamp: new Date().toISOString(),
+    database: dbStatus,
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
+    },
+  })
+})
+
+// 🔄 RECONNECT ENDPOINT
+app.get("/api/reconnect", async (req, res) => {
+  console.log("🔄 Reconnect requested...")
+
+  const result = await forceReconnect()
+  const dbStatus = getConnectionStatus()
+
+  res.json({
+    ...result,
+    timestamp: new Date().toISOString(),
+    database: dbStatus,
+  })
+})
+
+// 🧪 TEST DATABASE
+app.get("/api/test-db", async (req, res) => {
   try {
-    console.log("🔄 Manual reconnection requested...")
-    const result = await reconnectDB()
+    if (!isDBConnected()) {
+      return res.json({
+        success: false,
+        message: "Database not connected",
+        database: getConnectionStatus(),
+      })
+    }
+
+    // Try to list collections
+    const collections = await mongoose.connection.db.listCollections().toArray()
 
     res.json({
-      success: result.success,
-      message: result.message,
-      timestamp: new Date().toISOString(),
-      database: getDBStatus(),
+      success: true,
+      message: "Database test successful!",
+      collections: collections.map((c) => c.name),
+      database: getConnectionStatus(),
     })
   } catch (error) {
-    console.error("❌ Reconnection error:", error)
-    res.status(500).json({
+    res.json({
       success: false,
-      message: "Reconnection failed",
-      error: error.message,
-      timestamp: new Date().toISOString(),
+      message: "Database test failed: " + error.message,
+      database: getConnectionStatus(),
     })
   }
 })
 
-// 🚀 GET METHOD FOR EASIER TESTING
-app.get("/api/health/reconnect", async (req, res) => {
-  try {
-    console.log("🔄 Manual reconnection requested via GET...")
-    const result = await reconnectDB()
+// 🔧 DEBUG MONGO URI
+app.get("/api/debug", (req, res) => {
+  const uri = process.env.MONGO_URI
 
-    res.json({
-      success: result.success,
-      message: result.message,
-      timestamp: new Date().toISOString(),
-      database: getDBStatus(),
-    })
-  } catch (error) {
-    console.error("❌ Reconnection error:", error)
-    res.status(500).json({
-      success: false,
-      message: "Reconnection failed",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    })
+  if (!uri) {
+    return res.json({ error: "MONGO_URI not found" })
   }
+
+  // Parse URI safely
+  const parts = {
+    hasProtocol: uri.startsWith("mongodb"),
+    hasCredentials: uri.includes("@"),
+    hasDatabase: uri.split("/").length > 3,
+    hasOptions: uri.includes("?"),
+    length: uri.length,
+    preview: uri.substring(0, 20) + "..." + uri.substring(uri.length - 20),
+  }
+
+  res.json({
+    configured: true,
+    format: parts,
+    timestamp: new Date().toISOString(),
+  })
 })
 
 // API Routes
@@ -192,13 +157,12 @@ app.use("/api/v1/company", companyRoute)
 app.use("/api/v1/job", jobRoute)
 app.use("/api/v1/application", applicationRoute)
 
-// Error handling
+// Error handler
 app.use((err, req, res, next) => {
   console.error("❌ Server Error:", err.message)
   res.status(500).json({
     message: "Internal server error",
     success: false,
-    error: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
   })
 })
 
@@ -210,7 +174,7 @@ app.use("*", (req, res) => {
   })
 })
 
-// For local development
+// Start server (local only)
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
