@@ -50,15 +50,19 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 
-// Health check route
+// Health check route for the root URL
 app.get("/", (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   res.json({
     message: "Job Portal API is running!",
-    status: "success",
+    status: "healthy", // Changed to 'healthy' for consistency
+    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    database: dbStatus, // Added database status here
   })
 })
 
+// Health check route for /api/health (already includes database status)
 app.get("/api/health", (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   res.json({
