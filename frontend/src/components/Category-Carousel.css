@@ -1,0 +1,89 @@
+/* Main container */
+.category-carousel-container {
+  margin: 80px auto;
+  max-width: 1100px;
+  padding: 0 24px;
+  position: relative;
+}
+
+/* Carousel content area */
+.carousel-content {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 24px;
+  padding: 2px 0;
+  align-items: center;
+}
+
+/* Each carousel item (group of 3 buttons) */
+.carousel-item {
+  flex: 0 0 auto;
+  width: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* Group of 3 buttons inside each slide */
+.category-group {
+  display: flex;
+  gap: 24px;
+}
+
+/* Individual category button */
+.category-button {
+  padding: 14px 32px;
+  border-radius: 999px;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1f2937;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.35s ease;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Hover effect only on hovered button */
+.category-button:hover {
+  background: linear-gradient(to right, #6366f1, #8b5cf6);
+  color: #fff;
+  transform: translateY(1px) scale(1);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.25);
+}
+
+/* Carousel navigation buttons */
+.carousel-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 48px;
+  width: 48px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(to right, #a78bfa, #c084fc);
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);
+}
+
+.carousel-button:hover {
+  background: linear-gradient(to right, #7c3aed, #a855f7);
+  box-shadow: 0 8px 20px rgba(128, 90, 213, 0.35);
+}
+
+.carousel-button-left {
+  left: -24px;
+}
+
+.carousel-button-right {
+  right: -24px;
+}

@@ -1,0 +1,269 @@
+/* Main navbar */
+.navbar {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Logo */
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.logo-icon {
+  background: linear-gradient(to right, #7c3aed, #ec4899);
+  width: 32px;
+  height: 32px;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  color: white;
+  width: 20px;
+  height: 20px;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: bold;
+  background: linear-gradient(to right, #7c3aed, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Links */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #374151;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  background-color: #f3e8ff;
+  color: #9333ea;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Auth Buttons */
+.auth-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-outline {
+  border: 1px solid #d1d5db;
+  background-color: transparent;
+  transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+  background-color: #f3e8ff;
+  border-color: #c084fc;
+  color: #9333ea;
+}
+
+.btn-gradient {
+  background: linear-gradient(to right, #7c3aed, #ec4899);
+  color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+}
+
+.btn-gradient:hover {
+  background: linear-gradient(to right, #6d28d9, #db2777);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.4);
+}
+
+/* Avatar & Popover */
+.avatar-ring {
+  cursor: pointer;
+  border: 2px solid #e9d5ff;
+  transition: all 0.3s ease;
+}
+
+.avatar-ring:hover {
+  border-color: #c084fc;
+}
+
+.popover-content {
+  width: 320px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background-color: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.popover-inner {
+  padding: 1rem;
+}
+
+.popover-header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.avatar-md {
+  width: 48px;
+  height: 48px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.user-bio {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.popover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.popover-btn {
+  width: 100%;
+  justify-content: flex-start;
+  transition: all 0.3s ease;
+}
+
+.popover-btn:hover {
+  background-color: #f3e8ff;
+  color: #9333ea;
+}
+
+.popover-btn.logout:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.popover-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .navbar-links {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .nav-menu {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .auth-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+
+
+/* test  */
+
+.menu-toggle {
+  display: none;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  z-index: 100;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  transition: transform 0.3s ease-in-out;
+}
+
+@media (max-width: 768px) {
+  .menu-toggle {
+    display: block;
+  }
+
+  .navbar-links {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    width: 100%;
+    height: calc(100vh - 64px);
+    background-color: white;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 2rem;
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .navbar-links.open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .nav-menu {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .auth-buttons {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+}

@@ -1,0 +1,164 @@
+.applied-jobs-wrapper {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.table-header {
+  padding: 20px;
+  background: linear-gradient(to right, #f3e8ff, #ffe4e6);
+  border-bottom: 1px solid #eee;
+}
+
+.table-header h2 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.table-header p {
+  color: #666;
+  margin-top: 5px;
+}
+
+.table-caption {
+  padding: 10px;
+  color: #888;
+}
+
+.table-heading-row {
+  background-color: #fafafa;
+  transition: background 0.2s;
+}
+
+.table-heading-row:hover {
+  background-color: #f5f5ff;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.table-data-row {
+  border-bottom: 1px solid #eee;
+  transition: all 0.3s ease;
+}
+
+.job-role {
+  font-weight: 500;
+  color: #222;
+}
+
+.job-location {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.company-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.company-logo {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  border-radius: 50%;
+  color: #fff;
+  font-weight: bold;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.company-name {
+  font-weight: 500;
+  color: #222;
+}
+
+.resume-button {
+  color: #2563eb;
+  font-weight: 500;
+  background-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.resume-button:hover {
+  background-color: #e0edff;
+  color: #1d4ed8;
+}
+
+.no-resume {
+  color: #aaa;
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.badge.accepted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge.pending {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.no-data-cell {
+  text-align: center;
+  padding: 50px 20px;
+}
+
+.no-data-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.no-data-icon {
+  width: 60px;
+  height: 60px;
+  background: #f3f4f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-data-clock {
+  width: 30px;
+  height: 30px;
+  color: #9ca3af;
+}
+
+.no-data-title {
+  font-weight: 500;
+  color: #555;
+}
+
+.no-data-subtext {
+  font-size: 0.85rem;
+  color: #999;
+}
