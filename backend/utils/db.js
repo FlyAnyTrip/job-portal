@@ -3,7 +3,7 @@ import mongoose from "mongoose"
 // Global variable to track connection attempts
 let isConnecting = false
 let connectionAttempts = 0
-const MAX_RETRY_ATTEMPTS = 3
+const MAX_RETRY_ATTEMPTS = 5 // Increased attempts
 
 const connectDB = async () => {
   // Prevent multiple simultaneous connection attempts
@@ -31,48 +31,57 @@ const connectDB = async () => {
       await mongoose.connection.close()
     }
 
-    // 🚀 VERCEL-OPTIMIZED CONNECTION OPTIONS
+    // 🚀 ULTRA-AGGRESSIVE VERCEL CONNECTION OPTIONS
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
 
-      // 🔥 AGGRESSIVE TIMEOUT SETTINGS FOR VERCEL
-      serverSelectionTimeoutMS: 5000, // Reduced from 8000
-      connectTimeoutMS: 5000, // Reduced from 8000
-      socketTimeoutMS: 20000, // Reduced from 30000
+      // 🔥 VERY AGGRESSIVE TIMEOUT SETTINGS
+      serverSelectionTimeoutMS: 3000, // Very short
+      connectTimeoutMS: 3000, // Very short
+      socketTimeoutMS: 15000, // Shorter
 
-      // 🔥 MINIMAL CONNECTION POOL FOR SERVERLESS
-      maxPoolSize: 3, // Reduced from 5
-      minPoolSize: 0, // Reduced from 1
-      maxIdleTimeMS: 10000, // Reduced from 30000
+      // 🔥 MINIMAL POOL FOR SERVERLESS
+      maxPoolSize: 1, // Single connection
+      minPoolSize: 0,
+      maxIdleTimeMS: 5000, // Very short idle
 
-      // 🔥 FAST RETRY SETTINGS
+      // 🔥 FAST RETRY
       retryWrites: true,
-      retryReads: true,
+      retryReads: false, // Disable retry reads
 
-      // 🔥 DISABLE BUFFERING FOR SERVERLESS
+      // 🔥 NO BUFFERING
       bufferCommands: false,
       bufferMaxEntries: 0,
 
-      // 🔥 VERCEL-SPECIFIC OPTIMIZATIONS
+      // 🔥 NETWORK OPTIMIZATIONS
       family: 4, // Force IPv4
-      keepAlive: false, // Disable for serverless
+      keepAlive: false,
 
-      // 🔥 FAST WRITE CONCERN
-      w: "majority",
-      wtimeoutMS: 3000, // Reduced from 5000
+      // 🔥 WRITE CONCERN
+      w: 1, // Fastest write concern
+      wtimeoutMS: 2000,
 
-      // 🔥 ADDITIONAL SERVERLESS OPTIMIZATIONS
-      heartbeatFrequencyMS: 10000, // Less frequent heartbeats
-      serverSelectionRetryDelayMS: 1000, // Faster retries
+      // 🔥 ADDITIONAL AGGRESSIVE SETTINGS
+      heartbeatFrequencyMS: 30000, // Less frequent
+      serverSelectionRetryDelayMS: 500, // Very fast retries
+      maxStalenessSeconds: 90,
+
+      // 🔥 TLS/SSL SETTINGS (sometimes helps)
+      ssl: true,
+      sslValidate: true,
+
+      // 🔥 COMPRESSION
+      compressors: ["zlib"],
+      zlibCompressionLevel: 1,
     }
 
-    console.log("🚀 Attempting MongoDB connection with Vercel-optimized settings...")
+    console.log("🚀 Attempting ULTRA-AGGRESSIVE MongoDB connection...")
 
-    // 🔥 SHORTER CONNECTION TIMEOUT FOR VERCEL
+    // 🔥 VERY SHORT TIMEOUT
     const connectionPromise = mongoose.connect(process.env.MONGO_URI, options)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Connection timeout after 6 seconds")), 6000)
+      setTimeout(() => reject(new Error("Connection timeout after 4 seconds")), 4000)
     })
 
     const conn = await Promise.race([connectionPromise, timeoutPromise])
@@ -96,19 +105,18 @@ const connectDB = async () => {
     console.error(`❌ MongoDB connection failed (Attempt ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}):`)
     console.error("🔍 Error type:", error.name)
     console.error("🔍 Error message:", error.message)
+    console.error("🔍 Error stack:", error.stack)
 
     // Log specific error details
     if (error.code) {
       console.error("🔍 Error code:", error.code)
     }
 
-    // 🔥 FASTER RETRY FOR VERCEL
+    // 🔥 IMMEDIATE RETRY FOR VERCEL
     if (process.env.NODE_ENV === "production" && connectionAttempts < MAX_RETRY_ATTEMPTS) {
-      console.log(`🔄 Retrying connection in 1 second... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
-      setTimeout(() => {
-        connectDB()
-      }, 1000) // Reduced from 2000
-      return null
+      console.log(`🔄 IMMEDIATE retry... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
+      // No timeout - immediate retry
+      return connectDB()
     }
 
     // Reset attempts if max reached
@@ -137,19 +145,20 @@ const setupConnectionListeners = () => {
 
   mongoose.connection.on("error", (err) => {
     console.error("❌ Mongoose connection error:", err.message)
+    console.error("❌ Full error:", err)
   })
 
   mongoose.connection.on("disconnected", () => {
     console.log("🔴 Mongoose disconnected from MongoDB")
 
-    // 🔥 FASTER AUTO-RECONNECT FOR VERCEL
+    // 🔥 IMMEDIATE AUTO-RECONNECT
     if (process.env.NODE_ENV === "production") {
-      console.log("🔄 Attempting auto-reconnect...")
+      console.log("🔄 IMMEDIATE auto-reconnect attempt...")
       setTimeout(() => {
         if (mongoose.connection.readyState === 0) {
           connectDB()
         }
-      }, 2000) // Reduced from 5000
+      }, 500) // Very fast reconnect
     }
   })
 
