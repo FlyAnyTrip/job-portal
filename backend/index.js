@@ -7,6 +7,7 @@ import userRoute from "./routes/user.route.js"
 import companyRoute from "./routes/company.route.js"
 import jobRoute from "./routes/job.route.js"
 import applicationRoute from "./routes/application.route.js"
+import mongoose from "mongoose" // Import mongoose to check connection state
 
 // Load environment variables
 dotenv.config()
@@ -31,14 +32,15 @@ const corsOptions = {
     const allowedOrigins = [
       "http://localhost:5173",
       "http://localhost:3000",
-      "https://your-frontend-domain.vercel.app", // Replace with your actual frontend URL
-      process.env.FRONTEND_URL,
+      process.env.FRONTEND_URL, // Use environment variable for frontend URL
     ].filter(Boolean)
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
-      callback(null, true) // Allow all origins for now
+      // For now, allow all origins for easier testing.
+      // In production, you should restrict this to known origins.
+      callback(null, true)
     }
   },
   credentials: true,
@@ -58,10 +60,12 @@ app.get("/", (req, res) => {
 })
 
 app.get("/api/health", (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   res.json({
     status: "healthy",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    database: dbStatus,
   })
 })
 
