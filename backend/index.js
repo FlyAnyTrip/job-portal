@@ -20,7 +20,6 @@ console.log("🔍 Environment Validation:")
 console.log("- NODE_ENV:", process.env.NODE_ENV)
 console.log("- PORT:", process.env.PORT)
 console.log("- MONGO_URI exists:", !!process.env.MONGO_URI)
-console.log("- MONGO_URI starts with mongodb:", process.env.MONGO_URI?.startsWith("mongodb"))
 console.log("- SECRET_KEY exists:", !!process.env.SECRET_KEY)
 
 // Initialize database connection
@@ -48,7 +47,6 @@ app.use(cookieParser())
 // Enhanced CORS
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, etc.)
     if (!origin) return callback(null, true)
 
     const allowedOrigins = [
@@ -58,17 +56,11 @@ const corsOptions = {
       process.env.FRONTEND_URL,
     ].filter(Boolean)
 
-    // For development, allow all origins
     if (process.env.NODE_ENV === "development") {
       return callback(null, true)
     }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      // For production, be more permissive for now
-      callback(null, true)
-    }
+    callback(null, true) // Allow all for now
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -113,13 +105,8 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.2",
+    version: "1.0.3",
     server: "Vercel Serverless",
-    endpoints: {
-      health: "/api/health",
-      reconnect: "/api/health/reconnect",
-      debug: "/api/debug/mongo",
-    },
   })
 })
 
@@ -145,20 +132,15 @@ app.get("/api/health", async (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.2",
+    version: "1.0.3",
     memory: {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
     },
-    initialization: {
-      dbInitialized,
-      mongoUriConfigured: !!process.env.MONGO_URI,
-      secretKeyConfigured: !!process.env.SECRET_KEY,
-    },
   })
 })
 
-// 🚀 MANUAL RECONNECTION ENDPOINT (FIXED)
+// 🚀 MANUAL RECONNECTION ENDPOINT
 app.post("/api/health/reconnect", async (req, res) => {
   try {
     console.log("🔄 Manual reconnection requested...")
@@ -181,7 +163,7 @@ app.post("/api/health/reconnect", async (req, res) => {
   }
 })
 
-// 🚀 ALSO ADD GET METHOD FOR EASIER TESTING
+// 🚀 GET METHOD FOR EASIER TESTING
 app.get("/api/health/reconnect", async (req, res) => {
   try {
     console.log("🔄 Manual reconnection requested via GET...")
@@ -192,7 +174,6 @@ app.get("/api/health/reconnect", async (req, res) => {
       message: result.message,
       timestamp: new Date().toISOString(),
       database: getDBStatus(),
-      note: "Use POST method for proper reconnection",
     })
   } catch (error) {
     console.error("❌ Reconnection error:", error)
@@ -200,68 +181,6 @@ app.get("/api/health/reconnect", async (req, res) => {
       success: false,
       message: "Reconnection failed",
       error: error.message,
-      timestamp: new Date().toISOString(),
-    })
-  }
-})
-
-// 🔍 DEBUG: Connection string format check
-app.get("/api/debug/mongo", (req, res) => {
-  const mongoUri = process.env.MONGO_URI
-
-  if (!mongoUri) {
-    return res.json({
-      error: "MONGO_URI not found",
-      configured: false,
-    })
-  }
-
-  // Parse URI safely
-  const uriParts = {
-    protocol: mongoUri.split("://")[0],
-    hasCredentials: mongoUri.includes("@"),
-    hasDatabase: mongoUri.split("/").length > 3,
-    hasOptions: mongoUri.includes("?"),
-    length: mongoUri.length,
-    startsCorrectly: mongoUri.startsWith("mongodb"),
-    // Show first and last 10 characters for debugging
-    preview: `${mongoUri.substring(0, 20)}...${mongoUri.substring(mongoUri.length - 20)}`,
-  }
-
-  res.json({
-    configured: true,
-    format: uriParts,
-    timestamp: new Date().toISOString(),
-  })
-})
-
-// 🚀 FORCE CONNECTION ATTEMPT ENDPOINT
-app.get("/api/force-connect", async (req, res) => {
-  try {
-    console.log("🔥 Force connection attempt...")
-
-    // Close existing connection
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close()
-      console.log("🔄 Closed existing connection")
-    }
-
-    // Force new connection
-    await connectDB()
-
-    res.json({
-      success: true,
-      message: "Force connection completed",
-      database: getDBStatus(),
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("❌ Force connection failed:", error)
-    res.status(500).json({
-      success: false,
-      message: "Force connection failed",
-      error: error.message,
-      database: getDBStatus(),
       timestamp: new Date().toISOString(),
     })
   }
@@ -288,14 +207,6 @@ app.use("*", (req, res) => {
   res.status(404).json({
     message: `Route ${req.originalUrl} not found`,
     success: false,
-    availableEndpoints: [
-      "GET /",
-      "GET /api/health",
-      "POST /api/health/reconnect",
-      "GET /api/health/reconnect",
-      "GET /api/debug/mongo",
-      "GET /api/force-connect",
-    ],
   })
 })
 

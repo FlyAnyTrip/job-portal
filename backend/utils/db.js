@@ -3,7 +3,7 @@ import mongoose from "mongoose"
 // Global variable to track connection attempts
 let isConnecting = false
 let connectionAttempts = 0
-const MAX_RETRY_ATTEMPTS = 5 // Increased attempts
+const MAX_RETRY_ATTEMPTS = 3
 
 const connectDB = async () => {
   // Prevent multiple simultaneous connection attempts
@@ -22,66 +22,74 @@ const connectDB = async () => {
     }
 
     console.log(`🔍 Connection attempt ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}`)
-    console.log("🔗 MongoDB URI format check:", process.env.MONGO_URI.substring(0, 20) + "...")
-    console.log("🌍 Environment:", process.env.NODE_ENV)
+    console.log("🔗 MongoDB URI format check:", process.env.MONGO_URI.substring(0, 25) + "...")
 
     // Close existing connection if any
     if (mongoose.connection.readyState !== 0) {
       console.log("🔄 Closing existing connection...")
       await mongoose.connection.close()
+      // Wait a moment for cleanup
+      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
 
-    // 🚀 ULTRA-AGGRESSIVE VERCEL CONNECTION OPTIONS
+    // 🚀 CORRECTED CONNECTION STRING FORMAT
+    let mongoUri = process.env.MONGO_URI
+
+    // 🔥 ENSURE PROPER DATABASE NAME IN URI
+    if (!mongoUri.includes("/jobportal?")) {
+      // If URI doesn't have database name, add it
+      if (mongoUri.includes("?")) {
+        mongoUri = mongoUri.replace("/?", "/jobportal?")
+      } else {
+        mongoUri = mongoUri + "/jobportal?retryWrites=true&w=majority"
+      }
+    }
+
+    console.log("🔗 Using corrected URI:", mongoUri.substring(0, 25) + "...")
+
+    // 🚀 PRODUCTION-OPTIMIZED CONNECTION OPTIONS
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
 
-      // 🔥 VERY AGGRESSIVE TIMEOUT SETTINGS
-      serverSelectionTimeoutMS: 3000, // Very short
-      connectTimeoutMS: 3000, // Very short
-      socketTimeoutMS: 15000, // Shorter
+      // 🔥 PRODUCTION TIMEOUTS
+      serverSelectionTimeoutMS: 10000, // 10 seconds
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
 
-      // 🔥 MINIMAL POOL FOR SERVERLESS
-      maxPoolSize: 1, // Single connection
-      minPoolSize: 0,
-      maxIdleTimeMS: 5000, // Very short idle
+      // 🔥 CONNECTION POOL
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      maxIdleTimeMS: 30000,
 
-      // 🔥 FAST RETRY
+      // 🔥 RETRY SETTINGS
       retryWrites: true,
-      retryReads: false, // Disable retry reads
+      retryReads: true,
 
-      // 🔥 NO BUFFERING
+      // 🔥 BUFFERING
       bufferCommands: false,
       bufferMaxEntries: 0,
 
-      // 🔥 NETWORK OPTIMIZATIONS
-      family: 4, // Force IPv4
-      keepAlive: false,
+      // 🔥 AUTHENTICATION
+      authSource: "admin",
 
       // 🔥 WRITE CONCERN
-      w: 1, // Fastest write concern
-      wtimeoutMS: 2000,
+      w: "majority",
+      wtimeoutMS: 5000,
 
-      // 🔥 ADDITIONAL AGGRESSIVE SETTINGS
-      heartbeatFrequencyMS: 30000, // Less frequent
-      serverSelectionRetryDelayMS: 500, // Very fast retries
-      maxStalenessSeconds: 90,
+      // 🔥 READ PREFERENCE
+      readPreference: "primary",
 
-      // 🔥 TLS/SSL SETTINGS (sometimes helps)
-      ssl: true,
-      sslValidate: true,
-
-      // 🔥 COMPRESSION
-      compressors: ["zlib"],
-      zlibCompressionLevel: 1,
+      // 🔥 HEARTBEAT
+      heartbeatFrequencyMS: 10000,
     }
 
-    console.log("🚀 Attempting ULTRA-AGGRESSIVE MongoDB connection...")
+    console.log("🚀 Attempting MongoDB connection with corrected URI...")
 
-    // 🔥 VERY SHORT TIMEOUT
-    const connectionPromise = mongoose.connect(process.env.MONGO_URI, options)
+    // Connect with timeout
+    const connectionPromise = mongoose.connect(mongoUri, options)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Connection timeout after 4 seconds")), 4000)
+      setTimeout(() => reject(new Error("Connection timeout after 15 seconds")), 15000)
     })
 
     const conn = await Promise.race([connectionPromise, timeoutPromise])
@@ -90,6 +98,14 @@ const connectDB = async () => {
     console.log(`📍 Host: ${conn.connection.host}`)
     console.log(`🗄️  Database: ${conn.connection.name}`)
     console.log(`🔗 Connection State: ${conn.connection.readyState}`)
+
+    // Test the connection with a simple operation
+    try {
+      await mongoose.connection.db.admin().ping()
+      console.log("✅ Database ping successful!")
+    } catch (pingError) {
+      console.log("⚠️ Database ping failed:", pingError.message)
+    }
 
     // Reset connection attempts on success
     connectionAttempts = 0
@@ -105,29 +121,33 @@ const connectDB = async () => {
     console.error(`❌ MongoDB connection failed (Attempt ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}):`)
     console.error("🔍 Error type:", error.name)
     console.error("🔍 Error message:", error.message)
-    console.error("🔍 Error stack:", error.stack)
 
-    // Log specific error details
+    // Log specific MongoDB errors
     if (error.code) {
       console.error("🔍 Error code:", error.code)
     }
+    if (error.codeName) {
+      console.error("🔍 Error codeName:", error.codeName)
+    }
 
-    // 🔥 IMMEDIATE RETRY FOR VERCEL
-    if (process.env.NODE_ENV === "production" && connectionAttempts < MAX_RETRY_ATTEMPTS) {
-      console.log(`🔄 IMMEDIATE retry... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
-      // No timeout - immediate retry
-      return connectDB()
+    // Retry logic
+    if (connectionAttempts < MAX_RETRY_ATTEMPTS) {
+      console.log(`🔄 Retrying in 2 seconds... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
+      setTimeout(() => {
+        connectDB()
+      }, 2000)
+      return null
     }
 
     // Reset attempts if max reached
     if (connectionAttempts >= MAX_RETRY_ATTEMPTS) {
-      console.error("❌ Max connection attempts reached. Giving up.")
+      console.error("❌ Max connection attempts reached.")
       connectionAttempts = 0
     }
 
     // In production, don't throw error to allow app to start
     if (process.env.NODE_ENV === "production") {
-      console.log("🚀 Production mode: App will start without database")
+      console.log("🚀 Production mode: App will continue without database")
       return null
     }
 
@@ -145,20 +165,19 @@ const setupConnectionListeners = () => {
 
   mongoose.connection.on("error", (err) => {
     console.error("❌ Mongoose connection error:", err.message)
-    console.error("❌ Full error:", err)
   })
 
   mongoose.connection.on("disconnected", () => {
     console.log("🔴 Mongoose disconnected from MongoDB")
 
-    // 🔥 IMMEDIATE AUTO-RECONNECT
-    if (process.env.NODE_ENV === "production") {
-      console.log("🔄 IMMEDIATE auto-reconnect attempt...")
+    // Auto-reconnect in production
+    if (process.env.NODE_ENV === "production" && !isConnecting) {
+      console.log("🔄 Auto-reconnect attempt...")
       setTimeout(() => {
         if (mongoose.connection.readyState === 0) {
           connectDB()
         }
-      }, 500) // Very fast reconnect
+      }, 5000)
     }
   })
 
@@ -191,8 +210,17 @@ export const reconnectDB = async () => {
   }
 
   try {
+    console.log("🔄 Manual reconnect initiated...")
     await connectDB()
-    return { success: true, message: "Reconnected successfully" }
+
+    // Wait a moment and check connection
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    if (mongoose.connection.readyState === 1) {
+      return { success: true, message: "Reconnected successfully" }
+    } else {
+      return { success: false, message: "Reconnection attempted but still disconnected" }
+    }
   } catch (error) {
     return { success: false, message: error.message }
   }
