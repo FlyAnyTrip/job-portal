@@ -50,27 +50,149 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 
-// Health check route for the root URL
+// Enhanced health check route for the root URL
 app.get("/", (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
+  const dbReadyState = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+
   res.json({
     message: "Job Portal API is running!",
-    status: "healthy", // Changed to 'healthy' for consistency
-    uptime: process.uptime(),
+    status: "healthy",
+    uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
-    database: dbStatus, // Added database status here
+    database: {
+      status: dbStatus,
+      readyState: mongoose.connection.readyState,
+      readyStateText: dbReadyState[mongoose.connection.readyState],
+      host: mongoose.connection.host || "Not connected",
+      name: mongoose.connection.name || "Not connected",
+      collections: mongoose.connection.readyState === 1 ? Object.keys(mongoose.connection.collections).length : 0,
+    },
+    environment: process.env.NODE_ENV || "development",
+    version: "1.0.0",
   })
 })
 
-// Health check route for /api/health (already includes database status)
-app.get("/api/health", (req, res) => {
+// Detailed health check route for /api/health
+app.get("/api/health", async (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
+  const dbReadyState = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+
+  let dbDetails = {
+    status: dbStatus,
+    readyState: mongoose.connection.readyState,
+    readyStateText: dbReadyState[mongoose.connection.readyState],
+    host: "Not connected",
+    name: "Not connected",
+    collections: 0,
+    lastConnected: null,
+  }
+
+  // Get detailed DB info if connected
+  if (mongoose.connection.readyState === 1) {
+    try {
+      dbDetails = {
+        ...dbDetails,
+        host: mongoose.connection.host,
+        name: mongoose.connection.name,
+        collections: Object.keys(mongoose.connection.collections).length,
+        lastConnected: new Date().toISOString(),
+      }
+
+      // Test database with a simple query
+      await mongoose.connection.db.admin().ping()
+      dbDetails.pingTest = "success"
+    } catch (error) {
+      dbDetails.pingTest = "failed"
+      dbDetails.error = error.message
+    }
+  }
+
   res.json({
     status: "healthy",
-    uptime: process.uptime(),
+    uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
-    database: dbStatus,
+    database: dbDetails,
+    environment: process.env.NODE_ENV || "development",
+    version: "1.0.0",
+    memory: {
+      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
+    },
   })
+})
+
+// Database-specific health check route
+app.get("/api/health/database", async (req, res) => {
+  const dbReadyState = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      status: "unhealthy",
+      database: {
+        status: "disconnected",
+        readyState: mongoose.connection.readyState,
+        readyStateText: dbReadyState[mongoose.connection.readyState],
+        message: "Database is not connected",
+      },
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  try {
+    // Test database connection with ping
+    await mongoose.connection.db.admin().ping()
+
+    // Get database stats
+    const stats = await mongoose.connection.db.stats()
+
+    res.json({
+      status: "healthy",
+      database: {
+        status: "connected",
+        readyState: mongoose.connection.readyState,
+        readyStateText: "connected",
+        host: mongoose.connection.host,
+        name: mongoose.connection.name,
+        collections: Object.keys(mongoose.connection.collections).length,
+        stats: {
+          collections: stats.collections,
+          dataSize: `${Math.round(stats.dataSize / 1024 / 1024)} MB`,
+          storageSize: `${Math.round(stats.storageSize / 1024 / 1024)} MB`,
+          indexes: stats.indexes,
+        },
+        pingTest: "success",
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      database: {
+        status: "error",
+        readyState: mongoose.connection.readyState,
+        readyStateText: dbReadyState[mongoose.connection.readyState],
+        error: error.message,
+        pingTest: "failed",
+      },
+      timestamp: new Date().toISOString(),
+    })
+  }
 })
 
 // API routes
