@@ -31,45 +31,48 @@ const connectDB = async () => {
       await mongoose.connection.close()
     }
 
-    // Optimized connection options for Vercel
+    // 🚀 VERCEL-OPTIMIZED CONNECTION OPTIONS
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
 
-      // Timeout settings optimized for Vercel
-      serverSelectionTimeoutMS: 8000, // Reduced for faster failure
-      connectTimeoutMS: 8000,
-      socketTimeoutMS: 30000,
+      // 🔥 AGGRESSIVE TIMEOUT SETTINGS FOR VERCEL
+      serverSelectionTimeoutMS: 5000, // Reduced from 8000
+      connectTimeoutMS: 5000, // Reduced from 8000
+      socketTimeoutMS: 20000, // Reduced from 30000
 
-      // Connection pool settings
-      maxPoolSize: 5, // Reduced for serverless
-      minPoolSize: 1,
-      maxIdleTimeMS: 30000,
+      // 🔥 MINIMAL CONNECTION POOL FOR SERVERLESS
+      maxPoolSize: 3, // Reduced from 5
+      minPoolSize: 0, // Reduced from 1
+      maxIdleTimeMS: 10000, // Reduced from 30000
 
-      // Retry settings
+      // 🔥 FAST RETRY SETTINGS
       retryWrites: true,
       retryReads: true,
 
-      // Buffer settings
+      // 🔥 DISABLE BUFFERING FOR SERVERLESS
       bufferCommands: false,
       bufferMaxEntries: 0,
 
-      // Additional Vercel optimizations
+      // 🔥 VERCEL-SPECIFIC OPTIMIZATIONS
       family: 4, // Force IPv4
-      keepAlive: true,
-      keepAliveInitialDelay: 300000,
+      keepAlive: false, // Disable for serverless
 
-      // Write concern
+      // 🔥 FAST WRITE CONCERN
       w: "majority",
-      wtimeoutMS: 5000,
+      wtimeoutMS: 3000, // Reduced from 5000
+
+      // 🔥 ADDITIONAL SERVERLESS OPTIMIZATIONS
+      heartbeatFrequencyMS: 10000, // Less frequent heartbeats
+      serverSelectionRetryDelayMS: 1000, // Faster retries
     }
 
-    console.log("🚀 Attempting MongoDB connection...")
+    console.log("🚀 Attempting MongoDB connection with Vercel-optimized settings...")
 
-    // Set connection timeout
+    // 🔥 SHORTER CONNECTION TIMEOUT FOR VERCEL
     const connectionPromise = mongoose.connect(process.env.MONGO_URI, options)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Connection timeout after 10 seconds")), 10000)
+      setTimeout(() => reject(new Error("Connection timeout after 6 seconds")), 6000)
     })
 
     const conn = await Promise.race([connectionPromise, timeoutPromise])
@@ -99,12 +102,12 @@ const connectDB = async () => {
       console.error("🔍 Error code:", error.code)
     }
 
-    // Retry logic for production
+    // 🔥 FASTER RETRY FOR VERCEL
     if (process.env.NODE_ENV === "production" && connectionAttempts < MAX_RETRY_ATTEMPTS) {
-      console.log(`🔄 Retrying connection in 2 seconds... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
+      console.log(`🔄 Retrying connection in 1 second... (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})`)
       setTimeout(() => {
         connectDB()
-      }, 2000)
+      }, 1000) // Reduced from 2000
       return null
     }
 
@@ -139,14 +142,14 @@ const setupConnectionListeners = () => {
   mongoose.connection.on("disconnected", () => {
     console.log("🔴 Mongoose disconnected from MongoDB")
 
-    // Auto-reconnect in production
+    // 🔥 FASTER AUTO-RECONNECT FOR VERCEL
     if (process.env.NODE_ENV === "production") {
       console.log("🔄 Attempting auto-reconnect...")
       setTimeout(() => {
         if (mongoose.connection.readyState === 0) {
           connectDB()
         }
-      }, 5000)
+      }, 2000) // Reduced from 5000
     }
   })
 
