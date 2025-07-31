@@ -2,7 +2,7 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import cors from "cors"
 import dotenv from "dotenv"
-import connectDB from "./utils/db.js"
+import connectDB, { reconnectDB } from "./utils/db.js"
 import userRoute from "./routes/user.route.js"
 import companyRoute from "./routes/company.route.js"
 import jobRoute from "./routes/job.route.js"
@@ -15,31 +15,40 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 8000
 
-// Log environment variables (without sensitive data)
-console.log("🔍 Environment Check:")
+// Environment validation
+console.log("🔍 Environment Validation:")
 console.log("- NODE_ENV:", process.env.NODE_ENV)
 console.log("- PORT:", process.env.PORT)
 console.log("- MONGO_URI exists:", !!process.env.MONGO_URI)
-console.log("- MONGO_URI length:", process.env.MONGO_URI?.length || 0)
+console.log("- MONGO_URI starts with mongodb:", process.env.MONGO_URI?.startsWith("mongodb"))
+console.log("- SECRET_KEY exists:", !!process.env.SECRET_KEY)
 
-// Database connection with error handling
-let dbConnected = false
-try {
-  await connectDB()
-  dbConnected = true
-} catch (error) {
-  console.error("❌ Initial DB connection failed, app will continue")
-  dbConnected = false
+// Initialize database connection
+let dbInitialized = false
+const initializeDB = async () => {
+  try {
+    console.log("🚀 Initializing database connection...")
+    await connectDB()
+    dbInitialized = true
+    console.log("✅ Database initialization completed")
+  } catch (error) {
+    console.error("❌ Database initialization failed:", error.message)
+    dbInitialized = false
+  }
 }
+
+// Start DB initialization (non-blocking)
+initializeDB()
 
 // Middleware
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(cookieParser())
 
-// CORS configuration
+// Enhanced CORS
 const corsOptions = {
   origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, etc.)
     if (!origin) return callback(null, true)
 
     const allowedOrigins = [
@@ -49,94 +58,54 @@ const corsOptions = {
       process.env.FRONTEND_URL,
     ].filter(Boolean)
 
+    // For development, allow all origins
+    if (process.env.NODE_ENV === "development") {
+      return callback(null, true)
+    }
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
-      callback(null, true) // Allow all for now
+      // For production, be more permissive for now
+      callback(null, true)
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  optionsSuccessStatus: 200,
 }
 
 app.use(cors(corsOptions))
 
-// Enhanced health check with better error handling
+// Health check routes
 app.get("/", (req, res) => {
-  const dbReadyState = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  }
-
-  const connectionState = mongoose.connection.readyState
-  const isConnected = connectionState === 1
+  const dbStatus = getDBStatus()
 
   res.json({
-    message: "Job Portal API is running!",
+    message: "🚀 Job Portal API is running!",
     status: "healthy",
     uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
-    database: {
-      status: isConnected ? "connected" : "disconnected",
-      readyState: connectionState,
-      readyStateText: dbReadyState[connectionState],
-      host: isConnected ? mongoose.connection.host : "Not connected",
-      name: isConnected ? mongoose.connection.name : "Not connected",
-      collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
-      mongoUri: process.env.MONGO_URI ? "✅ Set" : "❌ Missing",
-      connectionAttempted: dbConnected,
-    },
+    database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.0",
+    version: "1.0.1",
+    server: "Vercel Serverless",
   })
 })
 
-// Detailed health check
 app.get("/api/health", async (req, res) => {
-  const dbReadyState = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  }
+  const dbStatus = getDBStatus()
 
-  const connectionState = mongoose.connection.readyState
-  const isConnected = connectionState === 1
-
-  const dbDetails = {
-    status: isConnected ? "connected" : "disconnected",
-    readyState: connectionState,
-    readyStateText: dbReadyState[connectionState],
-    host: isConnected ? mongoose.connection.host : "Not connected",
-    name: isConnected ? mongoose.connection.name : "Not connected",
-    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
-    lastConnected: null,
-    mongoUri: process.env.MONGO_URI ? "✅ Set" : "❌ Missing",
-    connectionAttempted: dbConnected,
-  }
-
-  // Test connection if connected
-  if (isConnected) {
+  // Try to ping database if connected
+  if (dbStatus.readyState === 1) {
     try {
       await mongoose.connection.db.admin().ping()
-      dbDetails.pingTest = "success"
-      dbDetails.lastConnected = new Date().toISOString()
+      dbStatus.pingTest = "✅ Success"
+      dbStatus.lastPing = new Date().toISOString()
     } catch (error) {
-      dbDetails.pingTest = "failed"
-      dbDetails.error = error.message
-    }
-  } else {
-    // Try to reconnect if disconnected
-    try {
-      console.log("🔄 Attempting to reconnect to database...")
-      await connectDB()
-      dbDetails.reconnectAttempt = "success"
-    } catch (error) {
-      dbDetails.reconnectAttempt = "failed"
-      dbDetails.reconnectError = error.message
+      dbStatus.pingTest = "❌ Failed"
+      dbStatus.pingError = error.message
     }
   }
 
@@ -144,56 +113,76 @@ app.get("/api/health", async (req, res) => {
     status: "healthy",
     uptime: `${Math.floor(process.uptime())} seconds`,
     timestamp: new Date().toISOString(),
-    database: dbDetails,
+    database: dbStatus,
     environment: process.env.NODE_ENV || "development",
-    version: "1.0.0",
+    version: "1.0.1",
     memory: {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
     },
+    initialization: {
+      dbInitialized,
+      mongoUriConfigured: !!process.env.MONGO_URI,
+      secretKeyConfigured: !!process.env.SECRET_KEY,
+    },
   })
 })
 
-// Database reconnection endpoint
+// Manual reconnection endpoint
 app.post("/api/health/reconnect", async (req, res) => {
   try {
-    console.log("🔄 Manual database reconnection requested...")
-
-    if (mongoose.connection.readyState === 1) {
-      return res.json({
-        success: true,
-        message: "Database is already connected",
-        status: "connected",
-      })
-    }
-
-    await connectDB()
+    console.log("🔄 Manual reconnection requested...")
+    const result = await reconnectDB()
 
     res.json({
-      success: true,
-      message: "Database reconnection successful",
-      status: "connected",
+      success: result.success,
+      message: result.message,
       timestamp: new Date().toISOString(),
+      database: getDBStatus(),
     })
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Database reconnection failed",
+      message: "Reconnection failed",
       error: error.message,
       timestamp: new Date().toISOString(),
     })
   }
 })
 
-// API routes
+// Database status helper
+function getDBStatus() {
+  const readyStates = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+
+  const readyState = mongoose.connection.readyState
+  const isConnected = readyState === 1
+
+  return {
+    status: isConnected ? "connected" : "disconnected",
+    readyState,
+    readyStateText: readyStates[readyState],
+    host: isConnected ? mongoose.connection.host : "Not connected",
+    name: isConnected ? mongoose.connection.name : "Not connected",
+    collections: isConnected ? Object.keys(mongoose.connection.collections).length : 0,
+    mongoUri: process.env.MONGO_URI ? "✅ Configured" : "❌ Missing",
+    initialized: dbInitialized,
+  }
+}
+
+// API Routes
 app.use("/api/v1/user", userRoute)
 app.use("/api/v1/company", companyRoute)
 app.use("/api/v1/job", jobRoute)
 app.use("/api/v1/application", applicationRoute)
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
-  console.error("Error:", err.message)
+  console.error("❌ Server Error:", err.message)
   res.status(500).json({
     message: "Internal server error",
     success: false,
@@ -204,12 +193,12 @@ app.use((err, req, res, next) => {
 // 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
-    message: "Route not found",
+    message: `Route ${req.originalUrl} not found`,
     success: false,
   })
 })
 
-// Start server
+// For local development
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
