@@ -2,47 +2,30 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import cors from "cors"
 import dotenv from "dotenv"
+import mongoose from "mongoose" // Added mongoose import for database health check
 import connectDB from "./utils/db.js"
 import userRoute from "./routes/user.route.js"
 import companyRoute from "./routes/company.route.js"
 import jobRoute from "./routes/job.route.js"
 import applicationRoute from "./routes/application.route.js"
-import mongoose from "mongoose" // Import mongoose to check connection state
 
-// Load environment variables
-dotenv.config()
+dotenv.config({})
 
 const app = express()
-const PORT = process.env.PORT || 8000
 
-// Database connection
-connectDB()
-
-// Middleware
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ extended: true, limit: "10mb" }))
+// middleware
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 
-// CORS configuration for production
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true)
-
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      process.env.FRONTEND_URL, // Use environment variable for frontend URL
-    ].filter(Boolean)
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      // For now, allow all origins for easier testing.
-      // In production, you should restrict this to known origins.
-      callback(null, true)
-    }
-  },
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://alis-job-portal.vercel.app", // Added your frontend URL
+    "https://job-portal-rho-bice.vercel.app", // Added new frontend URL
+    process.env.FRONTEND_URL || "https://your-app-name.vercel.app",
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
@@ -50,52 +33,111 @@ const corsOptions = {
 
 app.use(cors(corsOptions))
 
-// Health check route for the root URL
+app.use(async (req, res, next) => {
+  try {
+    await connectDB()
+    next()
+  } catch (error) {
+    console.error("Database connection failed:", error)
+    res.status(503).json({
+      error: "Database connection failed",
+      message: error.message,
+    })
+  }
+})
+
+const PORT = process.env.PORT || 3000
+
+// Root route for Vercel deployment
 app.get("/", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
-  res.json({
-    message: "Job Portal API is running!",
-    status: "healthy", // Changed to 'healthy' for consistency
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    database: dbStatus, // Added database status here
-  })
+  res.json({ message: "Job Portal API is running!" })
 })
 
-// Health check route for /api/health (already includes database status)
-app.get("/api/health", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected"
-  res.json({
-    status: "healthy",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    database: dbStatus,
-  })
+// Test route
+app.get("/test", (req, res) => {
+  res.json({ message: "Server is working!" })
 })
 
-// API routes
+app.get("/health", async (req, res) => {
+  try {
+    const dbStatus = {
+      connected: mongoose.connection.readyState === 1,
+      state: getConnectionState(mongoose.connection.readyState),
+      host: mongoose.connection.host || "Not connected",
+      name: mongoose.connection.name || "Not connected",
+    }
+
+    // Test database ping with timeout
+    let dbPing = null
+    let dbError = null
+
+    if (dbStatus.connected) {
+      try {
+        const startTime = Date.now()
+        await Promise.race([
+          mongoose.connection.db.admin().ping(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
+        ])
+        dbPing = Date.now() - startTime
+      } catch (error) {
+        dbError = error.message
+      }
+    }
+
+    const healthStatus = dbStatus.connected && !dbError ? "healthy" : "unhealthy"
+
+    res.status(healthStatus === "healthy" ? 200 : 503).json({
+      status: healthStatus,
+      message: "Job Portal API Health Check",
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || "development",
+      version: "1.0.0",
+      database: {
+        ...dbStatus,
+        ping: dbPing ? `${dbPing}ms` : "N/A",
+        error: dbError || null,
+        lastChecked: new Date().toISOString(),
+      },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
+      },
+    })
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      message: "Health check failed",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: false,
+        error: "Health check exception: " + error.message,
+      },
+    })
+  }
+})
+
+function getConnectionState(state) {
+  const states = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  }
+  return states[state] || "unknown"
+}
+
+// api's
 app.use("/api/v1/user", userRoute)
 app.use("/api/v1/company", companyRoute)
 app.use("/api/v1/job", jobRoute)
 app.use("/api/v1/application", applicationRoute)
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Error:", err.message)
-  res.status(500).json({
-    message: "Internal server error",
-    success: false,
-    error: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`Server running at port ${PORT}`)
   })
-})
+}
 
-// 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({
-    message: "Route not found",
-    success: false,
-  })
-})
-
-// Export for Vercel
 export default app
