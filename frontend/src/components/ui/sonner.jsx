@@ -1,39 +1,28 @@
-"use client"
-
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
-import "./Toaster.css" // ⬅ Importing modern CSS
 
-const Toaster = ({ ...props }) => {
+const Toaster = ({
+  ...props
+}) => {
   const { theme = "system" } = useTheme()
 
   return (
-    <Sonner
+    (<Sonner
       theme={theme}
       className="toaster group"
-      position="top-right"
-      richColors
-      closeButton
-      duration={3000}
-      expand={true}
-      visibleToasts={4}
       toastOptions={{
         classNames: {
-          toast: "toast",
-          description: "toast-description",
-          actionButton: "toast-action",
-          cancelButton: "toast-cancel",
-          closeButton: "toast-close",
-          success: "toast-success",
-          error: "toast-error",
-          warning: "toast-warning",
-          info: "toast-info",
+          toast:
+            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+          description: "group-[.toast]:text-muted-foreground",
+          actionButton:
+            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+          cancelButton:
+            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
-        style: {}, // CSS handles all styles now
       }}
-      {...props}
-    />
-  )
+      {...props} />)
+  );
 }
 
 export { Toaster }

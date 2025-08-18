@@ -158,33 +158,3 @@
     transform: rotate(360deg);
   }
 }
-
-
-
-/*  test  */
-
-.jobdesc-apply-btn.applied {
-  background: #f1f5f9; /* Soft blue-gray background */
-  color: #475569;       /* Slightly dark slate text */
-  cursor: not-allowed;
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px #cbd5e1;
-  opacity: 0.95;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-/* Optional icon-like checkmark (✔) at end */
-.jobdesc-apply-btn.applied::after {
-  content: '✔';
-  font-size: 14px;
-  margin-left: 8px;
-  color: #22c55e; /* green check icon */
-}
-
-/* Subtle hover effect (even if disabled) */
-.jobdesc-apply-btn.applied:hover {
-  background-color: #e2e8f0;
-  box-shadow: inset 0 0 0 2px #94a3b8;
-  transform: scale(1.01);
-}

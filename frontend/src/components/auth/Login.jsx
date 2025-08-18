@@ -11,7 +11,6 @@ import { toast } from 'sonner'
 import { useDispatch, useSelector } from 'react-redux'
 import { setLoading, setUser } from '@/redux/authSlice'
 import { Loader2 } from 'lucide-react'
-import './Login.css'
 
 const Login = () => {
     const [input, setInput] = useState({
@@ -19,7 +18,7 @@ const Login = () => {
         password: "",
         role: "",
     });
-    const { loading, user } = useSelector(store => store.auth);
+    const { loading,user } = useSelector(store => store.auth);
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
@@ -49,21 +48,18 @@ const Login = () => {
             dispatch(setLoading(false));
         }
     }
-
-    useEffect(() => {
-        if (user) {
+    useEffect(()=>{
+        if(user){
             navigate("/");
         }
-    }, []);
-
+    },[])
     return (
         <div>
             <Navbar />
-            <div className='login-container'>
-                <form onSubmit={submitHandler} className='login-box'>
-                    <h1 className='login-title'>Welcome Back</h1>
-                    <p className="login-subtext">Please login to your account</p>
-                    <div className='login-group'>
+            <div className='flex items-center justify-center max-w-7xl mx-auto'>
+                <form onSubmit={submitHandler} className='w-1/2 border border-gray-200 rounded-md p-4 my-10'>
+                    <h1 className='font-bold text-xl mb-5'>Login</h1>
+                    <div className='my-2'>
                         <Label>Email</Label>
                         <Input
                             type="email"
@@ -74,19 +70,18 @@ const Login = () => {
                         />
                     </div>
 
-                    <div className='login-group'>
+                    <div className='my-2'>
                         <Label>Password</Label>
                         <Input
                             type="password"
                             value={input.password}
                             name="password"
                             onChange={changeEventHandler}
-                            placeholder="••••••••"
+                            placeholder="patel@gmail.com"
                         />
                     </div>
-
-                    <div className='role-group'>
-                        <RadioGroup className="flex gap-6">
+                    <div className='flex items-center justify-between'>
+                        <RadioGroup className="flex items-center gap-4 my-5">
                             <div className="flex items-center space-x-2">
                                 <Input
                                     type="radio"
@@ -96,7 +91,7 @@ const Login = () => {
                                     onChange={changeEventHandler}
                                     className="cursor-pointer"
                                 />
-                                <Label>Student</Label>
+                                <Label htmlFor="r1">Student</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Input
@@ -107,21 +102,14 @@ const Login = () => {
                                     onChange={changeEventHandler}
                                     className="cursor-pointer"
                                 />
-                                <Label>Recruiter</Label>
+                                <Label htmlFor="r2">Recruiter</Label>
                             </div>
                         </RadioGroup>
                     </div>
-
-                    {loading ? (
-                        <Button className="login-btn">
-                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                            Please wait
-                        </Button>
-                    ) : (
-                        <Button type="submit" className="login-btn">Login</Button>
-                    )}
-
-                    <span className='login-footer'>Don't have an account? <Link to="/signup" className='signup-link'>Signup</Link></span>
+                    {
+                        loading ? <Button className="w-full my-4"> <Loader2 className='mr-2 h-4 w-4 animate-spin' /> Please wait </Button> : <Button type="submit" className="w-full my-4">Login</Button>
+                    }
+                    <span className='text-sm'>Don't have an account? <Link to="/signup" className='text-blue-600'>Signup</Link></span>
                 </form>
             </div>
         </div>

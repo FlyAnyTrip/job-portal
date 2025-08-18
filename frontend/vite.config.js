@@ -9,5 +9,22 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "./", // 👈 important for deployment
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          router: ["react-router-dom"],
+          redux: ["@reduxjs/toolkit", "react-redux", "redux-persist"],
+        },
+      },
+    },
+  },
+  server: {
+    port: 5173,
+    host: true,
+  },
+  base: "./",
 })
