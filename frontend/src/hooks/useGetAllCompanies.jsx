@@ -2,7 +2,7 @@
 
 import { setCompanies } from "@/redux/companySlice"
 import { COMPANY_API_END_POINT } from "@/utils/constant"
-import axios from "axios"
+import api from "@/utils/api"
 import { useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -21,12 +21,7 @@ const useGetAllCompanies = () => {
 
         console.log("Fetching companies for user:", user.fullname)
 
-        const res = await axios.get(`${COMPANY_API_END_POINT}/get`, {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        })
+        const res = await api.get(`${COMPANY_API_END_POINT}/get`)
 
         console.log("Companies response:", res.data)
 

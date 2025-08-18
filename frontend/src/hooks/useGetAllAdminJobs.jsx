@@ -2,7 +2,7 @@
 
 import { setAllAdminJobs } from "@/redux/jobSlice"
 import { JOB_API_END_POINT } from "@/utils/constant"
-import axios from "axios"
+import api from "@/utils/api"
 import { useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -19,16 +19,11 @@ const useGetAllAdminJobs = () => {
           return
         }
 
-        console.log("Fetching admin jobs for user:", user.fullname)
+        console.log("[v0] Fetching admin jobs for user:", user.fullname)
 
-        const res = await axios.get(`${JOB_API_END_POINT}/getadminjobs`, {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        })
+        const res = await api.get(`${JOB_API_END_POINT}/getadminjobs`)
 
-        console.log("Admin jobs response:", res.data)
+        console.log("[v0] Admin jobs response:", res.data)
 
         if (res.data.success) {
           dispatch(setAllAdminJobs(res.data.jobs))
@@ -37,8 +32,8 @@ const useGetAllAdminJobs = () => {
           dispatch(setAllAdminJobs([]))
         }
       } catch (error) {
-        console.error("Error fetching admin jobs:", error)
-        console.error("Error response:", error.response?.data)
+        console.error("[v0] Error fetching admin jobs:", error)
+        console.error("[v0] Error response:", error.response?.data)
         dispatch(setAllAdminJobs([]))
       }
     }
