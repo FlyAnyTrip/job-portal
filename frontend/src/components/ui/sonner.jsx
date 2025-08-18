@@ -1,12 +1,15 @@
 "use client"
 
+import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
-import "./Toaster.css"
+import "./Toaster.css" // ⬅ Importing modern CSS
 
 const Toaster = ({ ...props }) => {
+  const { theme = "system" } = useTheme()
+
   return (
     <Sonner
-      theme="system" // 👈 directly use system, or "light"/"dark"
+      theme={theme}
       className="toaster group"
       position="top-right"
       richColors
@@ -26,6 +29,7 @@ const Toaster = ({ ...props }) => {
           warning: "toast-warning",
           info: "toast-info",
         },
+        style: {}, // CSS handles all styles now
       }}
       {...props}
     />
